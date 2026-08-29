@@ -1,17 +1,24 @@
+from enum import Enum
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 
-class ClientBase(BaseModel):
-    first_name: str
-    last_name: str
-    phone: str
-    email: Optional[EmailStr] = None
+class OrderStatus(str, Enum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
-class ClientCreate(ClientBase):
-    pass
+class ServiceOrderBase(BaseModel):
+    description: str
+    status: OrderStatus = OrderStatus.PENDING
+    total_cost: float = 0.0
 
-class ClientResponse(ClientBase):
+class ServiceOrderCreate(ServiceOrderBase):
+    car_id: int
+
+class ServiceOrderResponse(ServiceOrderBase):
     id: int
+    car_id: int
 
     class Config:
         from_attributes = True
@@ -30,6 +37,22 @@ class CarCreate(CarBase):
 class CarResponse(CarBase):
     id: int
     owner_id: int
+
+    class Config:
+        from_attributes = True
+
+class ClientBase(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    email: Optional[EmailStr] = None
+
+class ClientCreate(ClientBase):
+    pass
+
+class ClientResponse(ClientBase):
+    id: int
+    cars: List[CarResponse] = []
 
     class Config:
         from_attributes = True

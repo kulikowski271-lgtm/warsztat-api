@@ -2,6 +2,7 @@ from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from database import engine, Base, get_db
 import models
@@ -33,20 +34,30 @@ async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends
 
     db.add(new_client)
     await db.commit()
-    await db.refresh(new_client)
 
-    return new_client
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == new_client.id)
+    )
+    return result.scalar_one()
 
 @app.get("/clients", response_model=List[schemas.ClientResponse])
 async def get_clients(db: AsyncSession = Depends(get_db)):
-    results = await db.execute(select(models.Client))
+    results = await db.execute(
+        select(models.Client).options(selectinload(models.Client.cars))
+    )
     clients = results.scalars().all()
     return clients
 
 @app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
 async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.Client).where(models.Client.id == client_id))
-    client = result.scalars().one_or_none()
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == client_id)
+    )
+    client = result.scalar_one_or_none()
 
     if client is None:
         raise HTTPException(
@@ -56,7 +67,24 @@ async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
 
     return client
 
-@app.post("/cars", response_model=schemas.CarsResponse, status_code=status.HTTP_201_CREATED)
+@app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
+async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == client_id)
+    )
+    client = result.scalar_one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {client_id} nie został znaleziony.",
+        )
+
+    return client
+
+@app.post("/cars", response_model=schemas.CarResponse, status_code=status.HTTP_201_CREATED)
 async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Client).where(models.Client.id == car.owner_id))
     client = result.scalar_one_or_none()
@@ -89,3 +117,45 @@ async def get_cars(db: AsyncSession = Depends(get_db)):
     cars = results.scalars().all()
     return cars
 
+@app.post("/orders", response_model=schemas.ServiceOrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(order: schemas.ServiceOrderCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Car).where(models.Car.id == order.car_id))
+    car = result.scalar_one_or_none()
+
+    if car is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Samochód o id {order.car_id} nie istnieje."
+        )
+
+    new_order = models.ServiceOrder(
+        description=order.description,
+        status=order.status.value,
+        total_cost=order.total_cost,
+        car_id=order.car_id
+    )
+
+    db.add(new_order)
+    await db.commit()
+    await db.refresh(new_order)
+
+    return new_order
+
+@app.get("/orders", response_model=List[schemas.ServiceOrderResponse])
+async def get_orders(db: AsyncSession = Depends(get_db)):
+    results = await db.execute(select(models.ServiceOrder))
+    orders = results.scalars().all()
+    return orders
+
+@app.get("/orders/{order_id}", response_model=schemas.ServiceOrderResponse)
+async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.ServiceOrder).where(models.ServiceOrder.id == order_id))
+    order = result.scalar_one_or_none()
+
+    if order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Zlecenie o id {order_id} nie zostało znalezione."
+        )
+
+    return order
