@@ -55,3 +55,37 @@ async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
         )
 
     return client
+
+@app.post("/cars", response_model=schemas.CarsResponse, status_code=status.HTTP_201_CREATED)
+async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Client).where(models.Client.id == car.owner_id))
+    client = result.scalar_one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {car.owner_id} nie istnieje."
+        )
+
+    new_car = models.Car(
+        brand=car.brand,
+        model=car.model,
+        registration_number=car.registration_number,
+        mileage=car.mileage,
+        body_type=car.body_type,
+        production_year=car.production_year,
+        owner_id=car.owner_id,
+    )
+
+    db.add(new_car)
+    await db.commit()
+    await db.refresh(new_car)
+
+    return new_car
+
+@app.get("/cars", response_model=List[schemas.CarResponse])
+async def get_cars(db: AsyncSession = Depends(get_db)):
+    results = await db.execute(select(models.Car))
+    cars = results.scalars().all()
+    return cars
+

@@ -13,5 +13,23 @@ class ClientCreate(ClientBase):
 class ClientResponse(ClientBase):
     id: int
 
-class Config:
-    from_attributes = True
+    class Config:
+        from_attributes = True
+
+class CarBase(BaseModel):
+    brand: str
+    model: str
+    registration_number: str
+    mileage: int
+    body_type: str
+    production_year: int
+
+class CarCreate(CarBase):
+    owner_id: int
+
+class CarResponse(CarBase):
+    id: int
+    owner_id: int
+
+    class Config:
+        from_attributes = True
