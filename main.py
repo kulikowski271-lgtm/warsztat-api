@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -35,3 +36,22 @@ async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends
     await db.refresh(new_client)
 
     return new_client
+
+@app.get("/clients", response_model=List[schemas.ClientResponse])
+async def get_clients(db: AsyncSession = Depends(get_db)):
+    results = await db.execute(select(models.Client))
+    clients = results.scalars().all()
+    return clients
+
+@app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
+async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Client).where(models.Client.id == client_id))
+    client = result.scalars().one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {client_id} nie został znaleziony.",
+        )
+
+    return client
