@@ -23,6 +23,10 @@ class ServiceOrderResponse(ServiceOrderBase):
     class Config:
         from_attributes = True
 
+class ServiceOrderUpdate(ServiceOrderBase):
+    status: Optional[OrderStatus] = None
+    total_cost: Optional[float] = None
+
 class CarBase(BaseModel):
     brand: str
     model: str
