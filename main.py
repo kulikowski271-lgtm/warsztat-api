@@ -1,12 +1,15 @@
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from typing import Optional, List
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import or_
 
 import models
 import schemas
-from database import get_db
+from database import engine, Base, get_db
+from auth import hash_password, verify_password, create_access_token, get_current_user
+
 
 app = FastAPI(title="Warsztat samochodowy API")
 
@@ -270,3 +273,42 @@ async def update_order(
     await db.refresh(order)
 
     return order
+
+@app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.User).where(models.User.email == user.email))
+    if result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Użytkownik o podanym adresie email już istnieje."
+        )
+
+    new_user = models.User(
+        email=user.email,
+        hash_password=hash_password(user.password),
+        role=user.role,
+    )
+
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    return new_user
+
+@app.post("/login", response_model=schemas.Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.User).where(models.User.email == form_data.username))
+    user = result.scalar_one_or_none()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Niepoprawny email i hasło.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    acces_token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": acces_token, "token_type": "bearer"}
+
+@app.get("/users/me", response_model=schemas.UserResponse)
+async def get_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
