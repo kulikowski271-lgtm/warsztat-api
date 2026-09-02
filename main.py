@@ -1,12 +1,12 @@
-from typing import List
-from fastapi import FastAPI, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from database import engine, Base, get_db
 import models
 import schemas
+from database import get_db
 
 app = FastAPI(title="Warsztat samochodowy API")
 
@@ -128,10 +128,27 @@ async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db))
     return result.scalar_one()
 
 @app.get("/cars", response_model=List[schemas.CarResponse])
-async def get_cars(db: AsyncSession = Depends(get_db)):
-    results = await db.execute(select(models.Car))
-    cars = results.scalars().all()
-    return cars
+async def get_cars(
+    brand: Optional[str] = Query(None, description="Filtruj po marce (np. BMW)"),
+    model: Optional[str] = Query(None, description="Filtruj po modelu (np. M3)"),
+    owner_id: Optional[int] = Query(None, description="Filtruj po ID właściciela"),
+    limit: int = Query(10, ge=1, le=100, description="Liczba rekordów na stronę (1-100)"),
+    offset: int = Query(0, ge=0, description="Liczba pomijanych rekordów"),
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(models.Car)
+
+    if brand:
+        query = query.where(models.Car.brand.ilike(f"%{brand.strip()}%"))
+    if model:
+        query = query.where(models.Car.model.ilike(f"%{model.strip()}%"))
+    if owner_id is not None:
+        query = query.where(models.Car.owner_id == owner_id)
+
+    query = query.offset(offset).limit(limit)
+
+    results = await db.execute(query)
+    return results.scalars().all()
 
 @app.get("/cars/{car_id}", response_model=schemas.CarResponse)
 async def get_car(car_id: int, db: AsyncSession = Depends(get_db)):
@@ -189,10 +206,31 @@ async def create_order(order: schemas.ServiceOrderCreate, db: AsyncSession = Dep
     return new_order
 
 @app.get("/orders", response_model=List[schemas.ServiceOrderResponse])
-async def get_orders(db: AsyncSession = Depends(get_db)):
-    results = await db.execute(select(models.ServiceOrder))
-    orders = results.scalars().all()
-    return orders
+async def get_orders(
+    status: Optional[schemas.OrderStatus] = Query(None, description="Filtruj po statusie"),
+    car_id: Optional[int] = Query(None, description="Filtruj po ID samochodu"),
+    min_cost: Optional[float] = Query(None, ge=0, description="Minimalny koszt zlecenia"),
+    max_cost: Optional[float] = Query(None, ge=0, description="Maksymalny koszt zlecenia"),
+    limit: int = Query(10, ge=1, le=100, description="Liczba rekordów na stronę (1-100)"),
+    offset: int = Query(0, ge=0, description="Liczba pomijanych rekordów"),
+    db: AsyncSession = Depends(get_db)
+):
+    query = select(models.ServiceOrder)
+
+    if status is not None:
+        query = query.where(models.ServiceOrder.status == status.value)
+    if car_id is not None:
+        query = query.where(models.ServiceOrder.car_id == car_id)
+    if min_cost is not None:
+        query = query.where(models.ServiceOrder.total_cost >= min_cost)
+    if max_cost is not None:
+        query = query.where(models.ServiceOrder.total_cost <= max_cost)
+
+    query = query.offset(offset).limit(limit)
+
+    results = await db.execute(query)
+    return results.scalars().all()
+
 
 @app.get("/orders/{order_id}", response_model=schemas.ServiceOrderResponse)
 async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
