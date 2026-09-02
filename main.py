@@ -3,7 +3,6 @@ from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 import models
@@ -286,7 +285,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
 
     new_user = models.User(
         email=user.email,
-        hash_password=hash_password(user.password),
+        hashed_password=hash_password(user.password),
         role=user.role,
     )
 
@@ -298,12 +297,12 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
 @app.post("/login", response_model=schemas.Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.User).where(models.User.email == form_data.username))
-    user = result.scalar_one_or_none()
+    user = result.scalars().first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Niepoprawny email i hasło.",
+            detail="Niepoprawny email lub hasło",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
