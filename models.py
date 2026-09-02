@@ -9,7 +9,7 @@ class Client(Base):
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
-    email: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
 
     cars: Mapped[list["Car"]] = relationship(back_populates="owner")
 
@@ -20,7 +20,7 @@ class Car(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     brand: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
-    registration_number: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    registration_number: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     mileage: Mapped[int] = mapped_column(Integer, nullable=False)
     body_type: Mapped[str] = mapped_column(String(50), nullable=False)
     production_year: Mapped[int] = mapped_column(Integer, nullable=False)

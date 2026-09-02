@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 
 class OrderStatus(str, Enum):
@@ -23,17 +23,25 @@ class ServiceOrderResponse(ServiceOrderBase):
     class Config:
         from_attributes = True
 
-class ServiceOrderUpdate(ServiceOrderBase):
+class ServiceOrderUpdate(BaseModel):
     status: Optional[OrderStatus] = None
     total_cost: Optional[float] = None
 
 class CarBase(BaseModel):
     brand: str
     model: str
-    registration_number: str
-    mileage: int
+    registration_number: str = Field(..., min_length=2, max_length=15, description="Numer rejestracyjny")
+    mileage: int = Field(..., ge=0, description="Przebieg nie może być ujemny")
     body_type: str
-    production_year: int
+    production_year: int = Field(..., ge=1900, le=2026, description="Prawidłowy rok produkcji")
+
+    @field_validator("registration_number")
+    @classmethod
+    def clean_registration_number(cls, v: str) -> str:
+        cleaned = v.strip().upper()
+        if not cleaned:
+            raise ValueError("Numer rejestracyjny nie może być pusty")
+        return cleaned
 
 class CarCreate(CarBase):
     owner_id: int
@@ -41,6 +49,7 @@ class CarCreate(CarBase):
 class CarResponse(CarBase):
     id: int
     owner_id: int
+    owner: Optional["ClientBase"] = None
 
     class Config:
         from_attributes = True

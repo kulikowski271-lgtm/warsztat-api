@@ -25,10 +25,24 @@ def health_check():
 
 @app.post("/clients", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends(get_db)):
+
+    if client.email:
+        clean_email = client.email.strip().lower()
+        existing_email = await db.execute(
+            select(models.Client).where(models.Client.email == clean_email)
+        )
+        if existing_email.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Klient z adresem email {clean_email} już istnieje w bazie."
+            )
+    else:
+        clean_email = None
+
     new_client = models.Client(
         first_name=client.first_name,
         last_name=client.last_name,
-        email=client.email,
+        email=clean_email,
         phone=client.phone
     )
 
@@ -78,6 +92,20 @@ async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db))
             detail=f"Klient o id {car.owner_id} nie istnieje."
         )
 
+    formatted_reg = car.registration_number.strip().upper()
+
+    result_car = await db.execute(
+        select(models.Car).where(models.Car.registration_number == formatted_reg)
+    )
+    existing_car = result_car.scalar_one_or_none()
+
+    if existing_car is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Samochód o numerze rejestracyjnym '{formatted_reg}' jest już w bazie.",
+
+        )
+
     new_car = models.Car(
         brand=car.brand,
         model=car.model,
@@ -92,7 +120,12 @@ async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(new_car)
 
-    return new_car
+    result = await db.execute(
+        select(models.Car)
+        .options(selectinload(models.Car.owner))
+        .where(models.Car.id == new_car.id)
+    )
+    return result.scalar_one()
 
 @app.get("/cars", response_model=List[schemas.CarResponse])
 async def get_cars(db: AsyncSession = Depends(get_db)):
@@ -114,6 +147,8 @@ async def get_car(car_id: int, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Samochód o id {car_id} nie został znaleziony."
         )
+
+    return car
 
 @app.delete("/cars/{car_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_car(car_id: int, db: AsyncSession = Depends(get_db)):
@@ -190,7 +225,7 @@ async def update_order(
     if order_update.status is not None:
         order.status = order_update.status.value
 
-    if order.total_cost is not None:
+    if order_update.total_cost is not None:
         order.total_cost = order_update.total_cost
 
     await db.commit()
