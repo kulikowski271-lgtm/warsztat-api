@@ -29,18 +29,15 @@ def health_check():
 @app.post("/clients", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends(get_db)):
 
-    if client.email:
-        clean_email = client.email.strip().lower()
-        existing_email = await db.execute(
-            select(models.Client).where(models.Client.email == clean_email)
+    clean_email = client.email.strip().lower()
+    existing_email = await db.execute(
+        select(models.Client).where(models.Client.email == clean_email)
+    )
+    if existing_email.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Klient z adresem email {clean_email} już istnieje w bazie."
         )
-        if existing_email.scalar_one_or_none() is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Klient z adresem email {clean_email} już istnieje w bazie."
-            )
-    else:
-        clean_email = None
 
     new_client = models.Client(
         first_name=client.first_name,
@@ -112,7 +109,7 @@ async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db))
     new_car = models.Car(
         brand=car.brand,
         model=car.model,
-        registration_number=car.registration_number,
+        registration_number=formatted_reg,
         mileage=car.mileage,
         body_type=car.body_type,
         production_year=car.production_year,
@@ -276,6 +273,8 @@ async def update_order(
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    clean_email = user.email.strip().lower()
+
     result = await db.execute(select(models.User).where(models.User.email == user.email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -284,7 +283,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
         )
 
     new_user = models.User(
-        email=user.email,
+        email=clean_email,
         hashed_password=hash_password(user.password),
         role=user.role,
     )
@@ -306,8 +305,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    acces_token = create_access_token(data={"sub": user.email, "role": user.role})
-    return {"access_token": acces_token, "token_type": "bearer"}
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me", response_model=schemas.UserResponse)
 async def get_me(current_user: models.User = Depends(get_current_user)):
