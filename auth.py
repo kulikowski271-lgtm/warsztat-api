@@ -57,3 +57,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     if user is None:
         raise credentials_exception
     return user
+
+def require_role(required_role: str):
+    async def role_checker(current_user: models.User = Depends(get_current_user)):
+        if current_user.role != required_role and current_user.role != "ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Brak wystarczających uprawnień do wykonania tej operacji."
+            )
+        return current_user
+    return role_checker

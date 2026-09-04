@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 import models
 import schemas
 from database import engine, Base, get_db
-from auth import hash_password, verify_password, create_access_token, get_current_user
+from auth import hash_password, verify_password, create_access_token, get_current_user, require_role
 
 
 app = FastAPI(title="Warsztat samochodowy API")
@@ -27,8 +27,11 @@ def health_check():
     return {"database": "ok", "server": "ok"}
 
 @app.post("/clients", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
-async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends(get_db)):
-
+async def create_client(
+        client: schemas.ClientCreate,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
     clean_email = client.email.strip().lower()
     existing_email = await db.execute(
         select(models.Client).where(models.Client.email == clean_email)
@@ -57,7 +60,10 @@ async def create_client(client: schemas.ClientCreate, db: AsyncSession = Depends
     return result.scalar_one()
 
 @app.get("/clients", response_model=List[schemas.ClientResponse])
-async def get_clients(db: AsyncSession = Depends(get_db)):
+async def get_clients(
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(get_current_user)
+):
     results = await db.execute(
         select(models.Client).options(selectinload(models.Client.cars))
     )
@@ -168,7 +174,11 @@ async def get_car(car_id: int, db: AsyncSession = Depends(get_db)):
     return car
 
 @app.delete("/cars/{car_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_car(car_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_car(
+        car_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("ADMIN"))
+):
     result = await db.execute(select(models.Car).where(models.Car.id == car_id))
     car = result.scalar_one_or_none()
 
@@ -250,6 +260,7 @@ async def update_order(
         order_id: int,
         order_update: schemas.ServiceOrderUpdate,
         db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
     result = await db.execute(select(models.ServiceOrder).where(models.ServiceOrder.id == order_id))
     order = result.scalar_one_or_none()
@@ -275,7 +286,7 @@ async def update_order(
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
     clean_email = user.email.strip().lower()
 
-    result = await db.execute(select(models.User).where(models.User.email == user.email))
+    result = await db.execute(select(models.User).where(models.User.email == clean_email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
