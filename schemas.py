@@ -93,11 +93,16 @@ class ClientResponse(ClientBase):
     class Config:
         from_attributes = True
 
+class UserRole(str, Enum):
+    ADMIN = "ADMIN"
+    MECHANIC = "MECHANIC"
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    role: Optional[str] = "MECHANIC"
-
 
 class UserResponse(BaseModel):
     id: int
@@ -108,11 +113,9 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class Token(BaseModel):
     access_token: str
     token_type: str
-
 
 class TokenData(BaseModel):
     email: Optional[str] = None

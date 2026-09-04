@@ -296,7 +296,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
     new_user = models.User(
         email=clean_email,
         hashed_password=hash_password(user.password),
-        role=user.role,
+        role="MECHANIC"
     )
 
     db.add(new_user)
@@ -322,3 +322,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 @app.get("/users/me", response_model=schemas.UserResponse)
 async def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@app.patch("/users/{user_id}lrole", response_model=schemas.UserResponse)
+async def update_user_role(
+        user_id: int,
+        role_update: schemas.UserRoleUpdate,
+        db: AsyncSession = Depends(get_db),
+        current_user: models.User = Depends(require_role("ADMIN")),
+):
+    result = await db.execute(select(models.User).where(models.User.id == user_id))
+    target_user = result.scalar_one_or_none()
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Użytkownik o id {user_id} nie istnieje."
+        )
+    if target_user.id == current_user.id and role_update.role != schemas.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie możesz odebrać samemu sobie roli ADMIN."
+        )
+
+    target_user.role = role_update.role.value
+    await db.commit()
+    await db.refresh(target_user)
+    return target_user

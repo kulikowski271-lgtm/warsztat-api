@@ -5,12 +5,17 @@ from sqlalchemy.orm import DeclarativeBase
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://admin:haslomaslo123@localhost:5432/warsztat_db"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+if not DATABASE_URL:
+    raise RuntimeError(
+        "Brak zmiennej środowiskowej DATABASE_URL. "
+        "Ustaw ją w pliku .env (patrz .env.example)."
+    )
+
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+engine = create_async_engine(DATABASE_URL, echo=DEBUG)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
