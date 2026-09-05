@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from sqlalchemy import text
 import models
 import schemas
 from database import engine, Base, get_db
@@ -23,8 +24,13 @@ def home():
     return {"status": "online", "message": "Witaj w API Warsztatu!"}
 
 @app.get("/api/v1/health")
-def health_check():
-    return {"database": "ok", "server": "ok"}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    try:
+        await db.execute(text("SELECT 1"))
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
+    return {"database": db_status, "server": "ok"}
 
 @app.post("/clients", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
