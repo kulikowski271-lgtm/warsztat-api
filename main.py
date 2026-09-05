@@ -98,7 +98,11 @@ async def get_client(
     return client
 
 @app.post("/cars", response_model=schemas.CarResponse, status_code=status.HTTP_201_CREATED)
-async def create_car(car: schemas.CarCreate, db: AsyncSession = Depends(get_db)):
+async def create_car(
+        car: schemas.CarCreate,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
     result = await db.execute(select(models.Client).where(models.Client.id == car.owner_id))
     client = result.scalar_one_or_none()
 
@@ -350,7 +354,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 async def get_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@app.patch("/users/{user_id}lrole", response_model=schemas.UserResponse)
+@app.patch("/users/{user_id}/role", response_model=schemas.UserResponse)
 async def update_user_role(
         user_id: int,
         role_update: schemas.UserRoleUpdate,

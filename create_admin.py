@@ -1,6 +1,5 @@
 import asyncio
 import sys
-import getpass
 
 from sqlalchemy.future import select
 
