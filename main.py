@@ -289,6 +289,9 @@ async def update_order(
             detail=f"Zlecenie o id {order_id} nie zostało znalezione."
         )
 
+    if order_update.description is not None:
+        order.description = order_update.description
+
     if order_update.status is not None:
         order.status = order_update.status.value
 
