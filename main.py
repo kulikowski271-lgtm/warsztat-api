@@ -71,7 +71,11 @@ async def get_clients(
     return clients
 
 @app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
-async def get_client(client_id: int, db: AsyncSession = Depends(get_db)):
+async def get_client(
+        client_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
     result = await db.execute(
         select(models.Client)
         .options(selectinload(models.Client.cars))
@@ -140,7 +144,8 @@ async def get_cars(
     owner_id: Optional[int] = Query(None, description="Filtruj po ID właściciela"),
     limit: int = Query(10, ge=1, le=100, description="Liczba rekordów na stronę (1-100)"),
     offset: int = Query(0, ge=0, description="Liczba pomijanych rekordów"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: models.User = Depends(get_current_user)
 ):
     query = select(models.Car)
 
@@ -157,7 +162,11 @@ async def get_cars(
     return results.scalars().all()
 
 @app.get("/cars/{car_id}", response_model=schemas.CarResponse)
-async def get_car(car_id: int, db: AsyncSession = Depends(get_db)):
+async def get_car(
+        car_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(get_current_user)
+):
     result = await db.execute(
         select(models.Car)
         .options(selectinload(models.Car.owner))
@@ -192,7 +201,11 @@ async def delete_car(
     return None
 
 @app.post("/orders", response_model=schemas.ServiceOrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(order: schemas.ServiceOrderCreate, db: AsyncSession = Depends(get_db)):
+async def create_order(
+        order: schemas.ServiceOrderCreate,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
     result = await db.execute(select(models.Car).where(models.Car.id == order.car_id))
     car = result.scalar_one_or_none()
 
@@ -223,7 +236,8 @@ async def get_orders(
     max_cost: Optional[float] = Query(None, ge=0, description="Maksymalny koszt zlecenia"),
     limit: int = Query(10, ge=1, le=100, description="Liczba rekordów na stronę (1-100)"),
     offset: int = Query(0, ge=0, description="Liczba pomijanych rekordów"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: models.User = Depends(get_current_user)
 ):
     query = select(models.ServiceOrder)
 
@@ -243,7 +257,11 @@ async def get_orders(
 
 
 @app.get("/orders/{order_id}", response_model=schemas.ServiceOrderResponse)
-async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
+async def get_order(
+        order_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(get_current_user)
+):
     result = await db.execute(select(models.ServiceOrder).where(models.ServiceOrder.id == order_id))
     order = result.scalar_one_or_none()
 
