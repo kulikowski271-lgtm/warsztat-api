@@ -10,8 +10,7 @@ async def test_health_check(client):
 async def test_register_user_success(client):
     payload = {
         "email": "mechanik@warsztat.pl",
-        "password": "haslo_testowe123",
-        "role": "MECHANIC"
+        "password": "haslo_testowe123"
     }
     response = await client.post("/register", json=payload)
     assert response.status_code == 201
@@ -22,7 +21,7 @@ async def test_register_user_success(client):
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email_fails(client):
-    payload = {"email": "jan@warsztat.pl", "password": "haslo", "role": "MECHANIC"}
+    payload = {"email": "jan@warsztat.pl", "password": "haslo"}
     res1 = await client.post("/register", json=payload)
     assert res1.status_code == 201
 
@@ -42,7 +41,7 @@ async def test_get_clients_unauthorized(client):
 
 @pytest.mark.asyncio
 async def test_create_and_get_client_with_jwt(client):
-    await client.post("/register", json={"email": "mechanic@warsztat.pl", "password": "haslo", "role": "MECHANIC"})
+    await client.post("/register", json={"email": "mechanic@warsztat.pl", "password": "haslo"})
 
     login_res = await client.post("/login", data={"username": "mechanic@warsztat.pl", "password": "haslo"})
     token = login_res.json()["access_token"]
@@ -64,7 +63,7 @@ async def test_create_and_get_client_with_jwt(client):
 
 @pytest.mark.asyncio
 async def test_create_car_invalid_future_year_fails(client):
-    await client.post("/register", json={"email": "mech@w.pl", "password": "pass", "role": "MECHANIC"})
+    await client.post("/register", json={"email": "mech@w.pl", "password": "pass"})
     login_res = await client.post("/login", data={"username": "mech@w.pl", "password": "pass"})
     headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
 
@@ -77,7 +76,7 @@ async def test_create_car_invalid_future_year_fails(client):
 
 @pytest.mark.asyncio
 async def test_create_order_negative_cost_fails(client):
-    await client.post("/register", json={"email": "m2@w.pl", "password": "pass", "role": "MECHANIC"})
+    await client.post("/register", json={"email": "m2@w.pl", "password": "pass"})
     login_res = await client.post("/login", data={"username": "m2@w.pl", "password": "pass"})
     headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
 
@@ -90,7 +89,7 @@ async def test_create_order_negative_cost_fails(client):
 
 @pytest.mark.asyncio
 async def test_delete_car_permission_denied_for_mechanic(client):
-    await client.post("/register", json={"email": "m3@w.pl", "password": "pass", "role": "MECHANIC"})
+    await client.post("/register", json={"email": "m3@w.pl", "password": "pass"})
     login_res = await client.post("/login", data={"username": "m3@w.pl", "password": "pass"})
     headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
 
@@ -98,8 +97,8 @@ async def test_delete_car_permission_denied_for_mechanic(client):
     assert response.status_code == 403
 
 @pytest.mark.asyncio
-async def test_delete_car_allowed_for_admin(client):
-    await client.post("/register", json={"email": "m4@w.pl", "password": "pass", "role": "MECHANIC"})
+async def test_delete_car_allowed_for_admin(client, admin_token):
+    await client.post("/register", json={"email": "m4@w.pl", "password": "pass"})
     login_mech = await client.post("/login", data={"username": "m4@w.pl", "password": "pass"})
     mech_headers = {"Authorization": f"Bearer {login_mech.json()['access_token']}"}
 
@@ -112,9 +111,7 @@ async def test_delete_car_allowed_for_admin(client):
     }, headers=mech_headers)
     car_id = car_res.json()["id"]
 
-    await client.post("/register", json={"email": "admin@w.pl", "password": "admin", "role": "ADMIN"})
-    login_admin = await client.post("/login", data={"username": "admin@w.pl", "password": "admin"})
-    admin_headers = {"Authorization": f"Bearer {login_admin.json()['access_token']}"}
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
     delete_res = await client.delete(f"/cars/{car_id}", headers=admin_headers)
     assert delete_res.status_code == 204

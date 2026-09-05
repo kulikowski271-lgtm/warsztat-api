@@ -3,6 +3,8 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from database import Base, get_db
 from main import app
+import models
+from auth import hash_password
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -39,3 +41,20 @@ async def client(db_session):
         yield ac
 
     app.dependency_overrides.clear()
+
+@pytest_asyncio.fixture(scope="function")
+async def admin_token(client, db_session):
+    admin_user = models.User(
+        email="admin@w.pl",
+        hashed_password=hash_password("admin1234"),
+        role="ADMIN",
+    )
+    db_session.add(admin_user)
+    await db_session.commit()
+
+    login_res = await client.post(
+        "/login", data={"username": "admin@w.pl", "password": "admin1234"}
+    )
+    assert login_res.status_code == 200, f"Logowanie admina nie powiodło się: {login_res.json()}"
+
+    return login_res.json()["access_token"]
