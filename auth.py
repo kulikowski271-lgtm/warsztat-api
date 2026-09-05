@@ -1,3 +1,5 @@
+"""Logika uwierzytelniania: hashowanie haseł, tokeny JWT i zależności autoryzacyjne."""
+
 import os
 from datetime import datetime, timedelta
 from typing import Optional
@@ -22,12 +24,15 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def hash_password(password: str) -> str:
+    #Hashuje hasło przy użyciu bcrypt.
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    # Weryfikuje hasło względem jego zahashowanej wersji.
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    #Tworzy podpisany token JWT z podanym czasem wygaśnięcia.
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -39,6 +44,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    #Zwraca zalogowanego użytkownika na podstawie tokenu JWT.
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Niepoprawne lub wygasłe dane uwierzytelniające.",
@@ -59,6 +65,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     return user
 
 def require_role(required_role: str):
+    #tworzy dependency wymagające konkretnej roli (ADMIN ma dostęp zawsze).
     async def role_checker(current_user: models.User = Depends(get_current_user)):
         if current_user.role != required_role and current_user.role != "ADMIN":
             raise HTTPException(

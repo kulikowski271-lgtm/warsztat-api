@@ -1,8 +1,11 @@
+"""Modele ORM reprezentujące tabele w bazie danych."""
+
 from sqlalchemy import String, Integer, ForeignKey, Float, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 class Client(Base):
+    #Klient warsztatu.
     __tablename__ = "clients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -15,6 +18,7 @@ class Client(Base):
 
 
 class Car(Base):
+    #Pojazd należący do klienta
     __tablename__ = "cars"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -32,6 +36,7 @@ class Car(Base):
 
 
 class ServiceOrder(Base):
+    #Zlecenie serwisowe dla pojazdu.
     __tablename__ = "service_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -44,10 +49,12 @@ class ServiceOrder(Base):
 
 
 class User(Base):
+    #Użytkownik systemu z przypisaną rolą dostępu.
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Rola ADMIN nadawana tylko przez create_admin.py
     role: Mapped[str] = mapped_column(String, default="MECHANIC")

@@ -1,3 +1,5 @@
+"""Konfiguracja połączenia z bazą danych PostgreSQL i sesji SQLAlchemy."""
+
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -23,6 +25,7 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False
 )
 class Base(DeclarativeBase):
+    #Bazowa klasa dla wszystkich modeli ORM.
     pass
 
 async def get_db():

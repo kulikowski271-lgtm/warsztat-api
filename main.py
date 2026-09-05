@@ -1,3 +1,5 @@
+"""Endpointy API do zarządzania klientami, pojazdami, zleceniami i użytkownikami."""
+
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
@@ -15,16 +17,19 @@ from auth import hash_password, verify_password, create_access_token, get_curren
 app = FastAPI(title="Warsztat samochodowy API")
 
 @app.on_event("startup")
+#Tworzy tabele w bazie przy starcie aplikacji.
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 @app.get("/")
 def home():
+    #Status działania API.
     return {"status": "online", "message": "Witaj w API Warsztatu!"}
 
 @app.get("/api/v1/health")
 async def health_check(db: AsyncSession = Depends(get_db)):
+    #Sprawdza dostępność serwera i realne połączenie z bazą danych.
     try:
         await db.execute(text("SELECT 1"))
         db_status = "ok"
@@ -38,6 +43,7 @@ async def create_client(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
+    #Tworzy nowego klienta warsztatu.
     clean_email = client.email.strip().lower()
     existing_email = await db.execute(
         select(models.Client).where(models.Client.email == clean_email)
@@ -70,6 +76,7 @@ async def get_clients(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(get_current_user)
 ):
+    #Zwraca listę wszystkich klientów wraz z pojazdami.
     results = await db.execute(
         select(models.Client).options(selectinload(models.Client.cars))
     )
@@ -82,6 +89,7 @@ async def get_client(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
+    #Zwraca szczegóły pojedynczego klienta.
     result = await db.execute(
         select(models.Client)
         .options(selectinload(models.Client.cars))
@@ -103,6 +111,7 @@ async def create_car(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
+    #Tworzy nowy pojazd przypisany do klienta.
     result = await db.execute(select(models.Client).where(models.Client.id == car.owner_id))
     client = result.scalar_one_or_none()
 
@@ -157,6 +166,7 @@ async def get_cars(
     db: AsyncSession = Depends(get_db),
     _current_user: models.User = Depends(get_current_user)
 ):
+    #Zwraca listę pojazdów z filtrowaniem i paginacją.
     query = select(models.Car)
 
     if brand:
@@ -177,6 +187,7 @@ async def get_car(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(get_current_user)
 ):
+    #Zwraca szczegóły pojedynczego pojazdu.
     result = await db.execute(
         select(models.Car)
         .options(selectinload(models.Car.owner))
@@ -198,6 +209,7 @@ async def delete_car(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("ADMIN"))
 ):
+    #Usuwa pojazd. Wymaga uprawnień administratora.
     result = await db.execute(select(models.Car).where(models.Car.id == car_id))
     car = result.scalar_one_or_none()
 
@@ -216,6 +228,7 @@ async def create_order(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
+    #Tworzy nowe zlecenie serwisowe dla pojazdu.
     result = await db.execute(select(models.Car).where(models.Car.id == order.car_id))
     car = result.scalar_one_or_none()
 
@@ -249,6 +262,7 @@ async def get_orders(
     db: AsyncSession = Depends(get_db),
     _current_user: models.User = Depends(get_current_user)
 ):
+    #Zwraca listę zleceń serwisowych z filtrowaniem i paginacją.
     query = select(models.ServiceOrder)
 
     if status is not None:
@@ -272,6 +286,7 @@ async def get_order(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(get_current_user)
 ):
+    #Zwraca szczegóły pojedynczego zlecenia serwisowego.
     result = await db.execute(select(models.ServiceOrder).where(models.ServiceOrder.id == order_id))
     order = result.scalar_one_or_none()
 
@@ -290,6 +305,7 @@ async def update_order(
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(require_role("MECHANIC"))
 ):
+    #Częściowo aktualizuje zlecenie serwisowe.
     result = await db.execute(select(models.ServiceOrder).where(models.ServiceOrder.id == order_id))
     order = result.scalar_one_or_none()
 
@@ -315,6 +331,7 @@ async def update_order(
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    #Rejestruje nowego użytkownika z domyślną rolą MECHANIC.
     clean_email = user.email.strip().lower()
 
     result = await db.execute(select(models.User).where(models.User.email == clean_email))
@@ -337,6 +354,7 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
 
 @app.post("/login", response_model=schemas.Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    #Loguje użytkownika i zwraca token JWT.
     result = await db.execute(select(models.User).where(models.User.email == form_data.username))
     user = result.scalars().first()
 
@@ -352,6 +370,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 
 @app.get("/users/me", response_model=schemas.UserResponse)
 async def get_me(current_user: models.User = Depends(get_current_user)):
+    #Zwraca dane aktualnie zalogowanego użytkownika.
     return current_user
 
 @app.patch("/users/{user_id}/role", response_model=schemas.UserResponse)
@@ -361,6 +380,7 @@ async def update_user_role(
         db: AsyncSession = Depends(get_db),
         current_user: models.User = Depends(require_role("ADMIN")),
 ):
+    #Zmienia rolę użytkownika. Wymaga uprawnień administratora.
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     target_user = result.scalar_one_or_none()
 
@@ -370,6 +390,7 @@ async def update_user_role(
             detail=f"Użytkownik o id {user_id} nie istnieje."
         )
     if target_user.id == current_user.id and role_update.role != schemas.UserRole.ADMIN:
+        #Zapobiega odebraniu sobie roli ADMIN przez ostatniego administratora
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nie możesz odebrać samemu sobie roli ADMIN."
