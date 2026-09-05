@@ -34,7 +34,7 @@ class ServiceOrderResponse(ServiceOrderBase):
         from_attributes = True
 
 class ServiceOrderUpdate(BaseModel):
-    description: str
+    description: Optional[str] = None
     status: Optional[OrderStatus] = None
     total_cost: float = Field(
         None,
