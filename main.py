@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy import text
 import models
@@ -15,6 +16,14 @@ from auth import hash_password, verify_password, create_access_token, get_curren
 
 
 app = FastAPI(title="Warsztat samochodowy API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5174"],  # adres Twojego frontendu
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 #Tworzy tabele w bazie przy starcie aplikacji.
