@@ -19,7 +19,10 @@ app = FastAPI(title="Warsztat samochodowy API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174"],  # adres Twojego frontendu
+    allow_origins=[
+        "http://localhost:5173", # adres Twojego frontendu
+        "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -176,7 +179,7 @@ async def get_cars(
     _current_user: models.User = Depends(get_current_user)
 ):
     #Zwraca listę pojazdów z filtrowaniem i paginacją.
-    query = select(models.Car)
+    query = select(models.Car).options(selectinload(models.Car.owner))
 
     if brand:
         query = query.where(models.Car.brand.ilike(f"%{brand.strip()}%"))
