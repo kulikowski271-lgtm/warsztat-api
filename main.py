@@ -412,3 +412,38 @@ async def update_user_role(
     await db.commit()
     await db.refresh(target_user)
     return target_user
+
+@app.put("/cars/{car_id}", response_model=schemas.CarResponse)
+async def update_car(
+        car_id: int,
+        car_update: schemas.CarCreate,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
+    #Aktualizuje dane pojazdu. Wymaga roli MECHANIC.
+    result = await db.execute(select(models.Car).where(models.Car.id == car_id))
+    car = result.scalar_one_or_none()
+
+    if car is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Samochód o id {car_id} nie został znaleziony."
+        )
+
+    car.brand = car_update.brand
+    car.model = car_update.model
+    car.registration_number = car_update.registration_number.strip().upper()
+    car.mileage = car_update.mileage
+    car.body_type = car_update.body_type
+    car.production_year = car_update.production_year
+    car.owner_id = car_update.owner_id
+
+    await db.commit()
+
+    # Pobieramy zaktualizowany obiekt wraz z relacją właściciela
+    result = await db.execute(
+        select(models.Car)
+        .options(selectinload(models.Car.owner))
+        .where(models.Car.id == car_id)
+    )
+    return result.scalar_one()
