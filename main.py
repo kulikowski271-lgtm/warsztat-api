@@ -188,7 +188,7 @@ async def get_cars(
     if owner_id is not None:
         query = query.where(models.Car.owner_id == owner_id)
 
-    query = query.offset(offset).limit(limit)
+    query = query.order_by(models.Car.id).offset(offset).limit(limit)
 
     results = await db.execute(query)
     return results.scalars().all()
@@ -286,7 +286,7 @@ async def get_orders(
     if max_cost is not None:
         query = query.where(models.ServiceOrder.total_cost <= max_cost)
 
-    query = query.offset(offset).limit(limit)
+    query = query.order_by(models.Car.id).offset(offset).limit(limit)
 
     results = await db.execute(query)
     return results.scalars().all()
