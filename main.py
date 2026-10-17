@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi.middleware.cors import CORSMiddleware
 
-from sqlalchemy import text
+from sqlalchemy import text, func, or_
 import models
 import schemas
 from database import engine, Base, get_db
@@ -83,39 +83,34 @@ async def create_client(
     )
     return result.scalar_one()
 
-@app.get("/clients", response_model=List[schemas.ClientResponse])
+@app.get("/clients", response_model=schemas.ClientListResponse)
 async def get_clients(
+        search: Optional[str] = Query(None, description="Szukaj po imieniu, nazwisku, emailu lub telefonie"),
+        limit: int = Query(10, ge=1, le=100, description="Liczba rekordów na stronę (1-100)"),
+        offset: int = Query(0, ge=0, description="Liczba pomijanych rekordów"),
         db: AsyncSession = Depends(get_db),
         _current_user: models.User = Depends(get_current_user)
 ):
-    #Zwraca listę wszystkich klientów wraz z pojazdami.
+    #Zwraca stronę klientów z wyszukiwaniem i łączną liczbą wyników.
+    query = select(models.Client)
+
+    if search and search.strip():
+        pattern = f"%{search.strip()}%"
+        query = query.where(or_(
+            (models.Client.first_name + " " + models.Client.last_name).ilike(pattern),
+            models.Client.email.ilike(pattern),
+            models.Client.phone.ilike(pattern),
+        ))
+
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
+
     results = await db.execute(
-        select(models.Client).options(selectinload(models.Client.cars))
+        query.options(selectinload(models.Client.cars))
+        .order_by(models.Client.id)
+        .offset(offset)
+        .limit(limit)
     )
-    clients = results.scalars().all()
-    return clients
-
-@app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
-async def get_client(
-        client_id: int,
-        db: AsyncSession = Depends(get_db),
-        _current_user: models.User = Depends(require_role("MECHANIC"))
-):
-    #Zwraca szczegóły pojedynczego klienta.
-    result = await db.execute(
-        select(models.Client)
-        .options(selectinload(models.Client.cars))
-        .where(models.Client.id == client_id)
-    )
-    client = result.scalar_one_or_none()
-
-    if client is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Klient o id {client_id} nie został znaleziony.",
-        )
-
-    return client
+    return {"items": results.scalars().all(), "total": total}
 
 @app.post("/cars", response_model=schemas.CarResponse, status_code=status.HTTP_201_CREATED)
 async def create_car(
@@ -168,8 +163,9 @@ async def create_car(
     )
     return result.scalar_one()
 
-@app.get("/cars", response_model=List[schemas.CarResponse])
+@app.get("/cars", response_model=schemas.CarListResponse)
 async def get_cars(
+    search: Optional[str] = Query(None, description="Szukaj po marce, modelu lub numerze rejestracyjnym"),
     brand: Optional[str] = Query(None, description="Filtruj po marce (np. BMW)"),
     model: Optional[str] = Query(None, description="Filtruj po modelu (np. M3)"),
     owner_id: Optional[int] = Query(None, description="Filtruj po ID właściciela"),
@@ -178,9 +174,15 @@ async def get_cars(
     db: AsyncSession = Depends(get_db),
     _current_user: models.User = Depends(get_current_user)
 ):
-    #Zwraca listę pojazdów z filtrowaniem i paginacją.
-    query = select(models.Car).options(selectinload(models.Car.owner))
+    #Zwraca stronę pojazdów z filtrowaniem, wyszukiwaniem i łączną liczbą wyników.
+    query = select(models.Car)
 
+    if search and search.strip():
+        pattern = f"%{search.strip()}%"
+        query = query.where(or_(
+            (models.Car.brand + " " + models.Car.model).ilike(pattern),
+            models.Car.registration_number.ilike(pattern),
+        ))
     if brand:
         query = query.where(models.Car.brand.ilike(f"%{brand.strip()}%"))
     if model:
@@ -188,10 +190,15 @@ async def get_cars(
     if owner_id is not None:
         query = query.where(models.Car.owner_id == owner_id)
 
-    query = query.order_by(models.Car.id).offset(offset).limit(limit)
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
 
-    results = await db.execute(query)
-    return results.scalars().all()
+    results = await db.execute(
+        query.options(selectinload(models.Car.owner))
+        .order_by(models.Car.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return {"items": results.scalars().all(), "total": total}
 
 @app.get("/cars/{car_id}", response_model=schemas.CarResponse)
 async def get_car(

@@ -59,7 +59,7 @@ async def test_create_and_get_client_with_jwt(client):
 
     get_res = await client.get("/clients", headers=headers)
     assert get_res.status_code == 200
-    assert len(get_res.json()) == 1
+    assert len(get_res.json()["items"]) == 1
 
 @pytest.mark.asyncio
 async def test_create_car_invalid_future_year_fails(client):
@@ -115,3 +115,24 @@ async def test_delete_car_allowed_for_admin(client, admin_token):
 
     delete_res = await client.delete(f"/cars/{car_id}", headers=admin_headers)
     assert delete_res.status_code == 204
+
+@pytest.mark.asyncio
+async def test_clients_search_and_pagination(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    for i in range(3):
+        await client.post("/clients", json={
+            "first_name": f"Jan{i}", "last_name": "Kowalski",
+            "phone": "123", "email": f"jan{i}@test.pl"
+        }, headers=headers)
+    await client.post("/clients", json={
+        "first_name": "Anna", "last_name": "Nowak",
+        "phone": "456", "email": "anna@test.pl"
+    }, headers=headers)
+
+    page = (await client.get("/clients?limit=2&offset=0", headers=headers)).json()
+    assert page["total"] == 4
+    assert len(page["items"]) == 2
+
+    found = (await client.get("/clients?search=nowak", headers=headers)).json()
+    assert found["total"] == 1
+    assert found["items"][0]["first_name"] == "Anna"

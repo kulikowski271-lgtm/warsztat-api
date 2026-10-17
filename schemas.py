@@ -107,6 +107,16 @@ class ClientResponse(ClientBase):
     class Config:
         from_attributes = True
 
+class ClientListResponse(BaseModel):
+    #Odpowiedź API zawierająca listę klientów.
+    items: List[ClientResponse]
+    total: int
+
+class CarListResponse(BaseModel):
+    #Odpowiedź API zawierająca listę pojazdów.
+    items: List[CarResponse]
+    total: int
+
 class UserRole(str, Enum):
     #Dostępne role użytkowników.
     ADMIN = "ADMIN"
