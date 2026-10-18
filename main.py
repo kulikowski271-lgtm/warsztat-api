@@ -112,6 +112,28 @@ async def get_clients(
     )
     return {"items": results.scalars().all(), "total": total}
 
+@app.get("/clients/{client_id}", response_model=schemas.ClientResponse)
+async def get_client(
+        client_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
+    #Zwraca szczegóły pojedynczego klienta.
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == client_id)
+    )
+    client = result.scalar_one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {client_id} nie został znaleziony.",
+        )
+
+    return client
+
 @app.post("/cars", response_model=schemas.CarResponse, status_code=status.HTTP_201_CREATED)
 async def create_car(
         car: schemas.CarCreate,
@@ -293,7 +315,7 @@ async def get_orders(
     if max_cost is not None:
         query = query.where(models.ServiceOrder.total_cost <= max_cost)
 
-    query = query.order_by(models.Car.id).offset(offset).limit(limit)
+    query = query.order_by(models.ServiceOrder.id).offset(offset).limit(limit)
 
     results = await db.execute(query)
     return results.scalars().all()
