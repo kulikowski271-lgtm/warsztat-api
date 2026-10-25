@@ -136,3 +136,27 @@ async def test_clients_search_and_pagination(client, admin_token):
     found = (await client.get("/clients?search=nowak", headers=headers)).json()
     assert found["total"] == 1
     assert found["items"][0]["first_name"] == "Anna"
+
+@pytest.mark.asyncio
+async def test_delete_client_rules(client, admin_token):  # NOWE
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    created = await client.post("/clients", json={
+        "first_name": "Jan", "last_name": "Test", "phone": "123", "email": "del@test.pl"
+    }, headers=admin_headers)
+    client_id = created.json()["id"]
+
+    await client.post("/register", json={"email": "mech-del@w.pl", "password": "pass"})
+    login = await client.post("/login", data={"username": "mech-del@w.pl", "password": "pass"})
+    mech_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    assert (await client.delete(f"/clients/{client_id}", headers=mech_headers)).status_code == 403
+
+    car = await client.post("/cars", json={
+        "brand": "Audi", "model": "A4", "registration_number": "DEL1234",
+        "mileage": 1000, "body_type": "Sedan", "production_year": 2018, "owner_id": client_id
+    }, headers=admin_headers)
+    assert (await client.delete(f"/clients/{client_id}", headers=admin_headers)).status_code == 400
+
+    await client.delete(f"/cars/{car.json()['id']}", headers=admin_headers)
+    assert (await client.delete(f"/clients/{client_id}", headers=admin_headers)).status_code == 204
+    assert (await client.get(f"/clients/{client_id}", headers=admin_headers)).status_code == 404

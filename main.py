@@ -134,6 +134,33 @@ async def get_client(
 
     return client
 
+@app.delete("/clients/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_client(
+        client_id: int,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("ADMIN"))
+):
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == client_id)
+    )
+    client = result.scalar_one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {client_id} nie został znaleziony."
+        )
+    if client.cars:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie można usunąć klienta, który ma przypisane pojazdy. Najpierw usuń jego pojazdy."
+        )
+    await db.delete(client)
+    await db.commit()
+    return None
+
 @app.post("/cars", response_model=schemas.CarResponse, status_code=status.HTTP_201_CREATED)
 async def create_car(
         car: schemas.CarCreate,
