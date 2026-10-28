@@ -404,6 +404,15 @@ async def update_order(
     if order_update.total_cost is not None:
         order.total_cost = order_update.total_cost
 
+    if order_update.car_id is not None:
+        car_result = await db.execute(select(models.Car).where(models.Car.id == order_update.car_id))
+        if car_result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Samochód o id {order_update.car_id} nie istnieje."
+            )
+        order.car_id = order_update.car_id
+
     await db.commit()
     await db.refresh(order)
 

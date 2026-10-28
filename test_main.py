@@ -188,3 +188,32 @@ async def test_delete_car_with_orders_is_blocked(client, admin_token):
         "owner_id": owner.json()["id"]
     }, headers=headers)
     assert (await client.delete(f"/cars/{car2.json()['id']}", headers=headers)).status_code == 204
+
+@pytest.mark.asyncio
+async def test_update_order_changes_car(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    owner = await client.post("/clients", json={
+        "first_name": "Ewa", "last_name": "Test", "phone": "123", "email": "ewa@test.pl"
+    }, headers=headers)
+    owner_id = owner.json()["id"]
+
+    car_ids = []
+    for reg in ("UPD1111", "UPD2222"):
+        car = await client.post("/cars", json={
+            "brand": "Audi", "model": "A3", "registration_number": reg,
+            "mileage": 1000, "body_type": "Sedan", "production_year": 2018, "owner_id": owner_id
+        }, headers=headers)
+        car_ids.append(car.json()["id"])
+
+    order = await client.post("/orders", json={
+        "description": "Przegląd", "status": "PENDING", "total_cost": 100, "car_id": car_ids[0]
+    }, headers=headers)
+    order_id = order.json()["id"]
+
+    res = await client.patch(f"/orders/{order_id}", json={"car_id": car_ids[1]}, headers=headers)
+    assert res.status_code == 200
+    assert res.json()["car_id"] == car_ids[1]
+
+    res = await client.patch(f"/orders/{order_id}", json={"car_id": 99999}, headers=headers)
+    assert res.status_code == 404

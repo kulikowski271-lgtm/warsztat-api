@@ -44,6 +44,7 @@ class ServiceOrderUpdate(BaseModel):
     #Częściowa aktualizacja zlecenia (PATCH) - wszystkie pola opcjonalne.
     description: Optional[str] = None
     status: Optional[OrderStatus] = None
+    car_id: Optional[int] = None
     total_cost: float = Field(
         None,
         ge=0,
