@@ -160,3 +160,31 @@ async def test_delete_client_rules(client, admin_token):  # NOWE
     await client.delete(f"/cars/{car.json()['id']}", headers=admin_headers)
     assert (await client.delete(f"/clients/{client_id}", headers=admin_headers)).status_code == 204
     assert (await client.get(f"/clients/{client_id}", headers=admin_headers)).status_code == 404
+
+@pytest.mark.asyncio
+async def test_delete_car_with_orders_is_blocked(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    owner = await client.post("/clients", json={
+        "first_name": "Ola", "last_name": "Test", "phone": "123", "email": "ola@test.pl"
+    }, headers=headers)
+    car = await client.post("/cars", json={
+        "brand": "Opel", "model": "Astra", "registration_number": "BLK1234",
+        "mileage": 1000, "body_type": "Hatchback", "production_year": 2015,
+        "owner_id": owner.json()["id"]
+    }, headers=headers)
+    car_id = car.json()["id"]
+
+    order = await client.post("/orders", json={
+        "description": "Wymiana oleju", "status": "PENDING", "total_cost": 100, "car_id": car_id
+    }, headers=headers)
+    assert order.status_code == 201
+
+    assert (await client.delete(f"/cars/{car_id}", headers=headers)).status_code == 400
+
+    car2 = await client.post("/cars", json={
+        "brand": "Fiat", "model": "Panda", "registration_number": "FREE123",
+        "mileage": 500, "body_type": "Hatchback", "production_year": 2019,
+        "owner_id": owner.json()["id"]
+    }, headers=headers)
+    assert (await client.delete(f"/cars/{car2.json()['id']}", headers=headers)).status_code == 204

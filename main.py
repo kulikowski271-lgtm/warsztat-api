@@ -278,7 +278,12 @@ async def delete_car(
         _current_user: models.User = Depends(require_role("ADMIN"))
 ):
     #Usuwa pojazd. Wymaga uprawnień administratora.
-    result = await db.execute(select(models.Car).where(models.Car.id == car_id))
+    result = await db.execute(
+        select(models.Car)
+        .options(selectinload(models.Car.service_orders))
+        .where(models.Car.id == car_id)
+        .execution_options(populate_existing=True)
+    )
     car = result.scalar_one_or_none()
 
     if car is None:
@@ -286,6 +291,13 @@ async def delete_car(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"samochód o id {car_id} nie został znaleziony."
         )
+
+    if car.service_orders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie można usunąć pojazdu, który ma zlecenia serwisowe."
+        )
+
     await db.delete(car)
     await db.commit()
     return None
