@@ -40,6 +40,10 @@ class ServiceOrderResponse(ServiceOrderBase):
     class Config:
         from_attributes = True
 
+class ServiceOrderListResponse(BaseModel):
+    items: List[ServiceOrderResponse]
+    total: int
+
 class ServiceOrderUpdate(BaseModel):
     #Częściowa aktualizacja zlecenia (PATCH) - wszystkie pola opcjonalne.
     description: Optional[str] = None

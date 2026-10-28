@@ -331,8 +331,9 @@ async def create_order(
 
     return new_order
 
-@app.get("/orders", response_model=List[schemas.ServiceOrderResponse])
+@app.get("/orders", response_model=schemas.ServiceOrderListResponse)
 async def get_orders(
+    search: Optional[str] = Query(None, description="Szukaj w opisie zlecenia"),
     status: Optional[schemas.OrderStatus] = Query(None, description="Filtruj po statusie"),
     car_id: Optional[int] = Query(None, description="Filtruj po ID samochodu"),
     min_cost: Optional[float] = Query(None, ge=0, description="Minimalny koszt zlecenia"),
@@ -345,6 +346,8 @@ async def get_orders(
     #Zwraca listę zleceń serwisowych z filtrowaniem i paginacją.
     query = select(models.ServiceOrder)
 
+    if search and search.strip():
+        query = query.where(models.ServiceOrder.description.ilike(f"%{search.strip()}%"))
     if status is not None:
         query = query.where(models.ServiceOrder.status == status.value)
     if car_id is not None:
@@ -354,10 +357,12 @@ async def get_orders(
     if max_cost is not None:
         query = query.where(models.ServiceOrder.total_cost <= max_cost)
 
-    query = query.order_by(models.ServiceOrder.id).offset(offset).limit(limit)
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
 
-    results = await db.execute(query)
-    return results.scalars().all()
+    results = await db.execute(
+        query.order_by(models.ServiceOrder.id).offset(offset).limit(limit)
+    )
+    return {"items": results.scalars().all(), "total": total}
 
 
 @app.get("/orders/{order_id}", response_model=schemas.ServiceOrderResponse)

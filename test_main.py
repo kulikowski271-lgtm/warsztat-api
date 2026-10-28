@@ -217,3 +217,28 @@ async def test_update_order_changes_car(client, admin_token):
 
     res = await client.patch(f"/orders/{order_id}", json={"car_id": 99999}, headers=headers)
     assert res.status_code == 404
+
+@pytest.mark.asyncio
+async def test_orders_search_and_pagination(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    owner = await client.post("/clients", json={
+        "first_name": "Adam", "last_name": "Test", "phone": "123", "email": "adam@test.pl"
+    }, headers=headers)
+    car = await client.post("/cars", json={
+        "brand": "Kia", "model": "Ceed", "registration_number": "ORD1234",
+        "mileage": 1000, "body_type": "Kombi", "production_year": 2017,
+        "owner_id": owner.json()["id"]
+    }, headers=headers)
+    car_id = car.json()["id"]
+
+    for desc in ("Wymiana oleju", "Wymiana klocków", "Przegląd"):
+        await client.post("/orders", json={
+            "description": desc, "status": "PENDING", "total_cost": 50, "car_id": car_id
+        }, headers=headers)
+
+    page = (await client.get("/orders?limit=2", headers=headers)).json()
+    assert page["total"] == 3
+    assert len(page["items"]) == 2
+
+    found = (await client.get("/orders?search=klocków", headers=headers)).json()
+    assert found["total"] == 1
