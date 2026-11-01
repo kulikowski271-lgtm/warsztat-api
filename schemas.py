@@ -44,6 +44,24 @@ class ServiceOrderListResponse(BaseModel):
     items: List[ServiceOrderResponse]
     total: int
 
+class DashboardOrder(BaseModel):
+    #Zlecenie z nazwą pojazdu i klienta, do tabeli na stronie głównej.
+    id: int
+    description: str
+    status: OrderStatus
+    total_cost: float
+    car_name: str
+    client_name: str
+
+class DashboardStats(BaseModel):
+    #Liczby i ostatnie zlecenia pokazywane na pulpicie.
+    clients_count: int
+    cars_count: int
+    active_orders: int
+    completed_orders: int
+    revenue: float
+    recent_orders: List[DashboardOrder]
+
 class ServiceOrderUpdate(BaseModel):
     #Częściowa aktualizacja zlecenia (PATCH) - wszystkie pola opcjonalne.
     description: Optional[str] = None

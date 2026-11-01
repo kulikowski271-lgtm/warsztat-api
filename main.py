@@ -49,6 +49,52 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         db_status = "error"
     return {"database": db_status, "server": "ok"}
 
+@app.get("/api/v1/dashboard", response_model=schemas.DashboardStats)
+async def get_dashboard(
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
+    clients_count = await db.scalar(select(func.count(models.Client.id)).select_from(models.Client))
+    cars_count = await db.scalar(select(func.count(models.Car.id)).select_from(models.Car))
+
+    status_rows = await db.execute(
+        select(models.ServiceOrder.status, func.count()).group_by(models.ServiceOrder.status)
+    )
+    by_status = dict(status_rows.all())
+
+    revenue = await db.scalar(
+        select(func.coalesce(func.sum(models.ServiceOrder.total_cost), 0))
+        .where(models.ServiceOrder.status == "COMPLETED")
+    )
+    recent = await db.execute(
+        select(models.ServiceOrder)
+        .options(selectinload(models.ServiceOrder.car).selectinload(
+            models.Car.owner))
+        .where(models.ServiceOrder.status.in_(["PENDING", "IN_PROGRESS"]))
+        .order_by(models.ServiceOrder.id.desc())
+        .limit(5)
+        .execution_options(populate_existing=True)
+    )
+
+    return {
+        "clients_count": clients_count,
+        "cars_count": cars_count,
+        "active_orders": by_status.get("PENDING", 0) + by_status.get("IN_PROGRESS", 0),
+        "completed_orders": by_status.get("COMPLETED", 0),
+        "revenue": revenue,
+        "recent_orders": [
+            {
+                "id": o.id,
+                "description": o.description,
+                "status": o.status,
+                "total_cost": o.total_cost,
+                "car_name": f"{o.car.brand} {o.car.model}",
+                "client_name": f"{o.car.owner.first_name} {o.car.owner.last_name}",
+            }
+            for o in recent.scalars().all()
+        ],
+    }
+
 @app.post("/clients", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
         client: schemas.ClientCreate,

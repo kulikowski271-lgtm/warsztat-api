@@ -242,3 +242,35 @@ async def test_orders_search_and_pagination(client, admin_token):
 
     found = (await client.get("/orders?search=klocków", headers=headers)).json()
     assert found["total"] == 1
+
+@pytest.mark.asyncio
+async def test_dashboard_stats(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    owner = await client.post("/clients", json={
+        "first_name": "Jan", "last_name": "Dash", "phone": "123", "email": "dash@test.pl"
+    }, headers=headers)
+    car = await client.post("/cars", json={
+        "brand": "Kia", "model": "Ceed", "registration_number": "DSH1234",
+        "mileage": 1000, "body_type": "Kombi", "production_year": 2017,
+        "owner_id": owner.json()["id"]
+    }, headers=headers)
+    car_id = car.json()["id"]
+
+    await client.post("/orders", json={
+        "description": "Przegląd", "status": "PENDING", "total_cost": 100, "car_id": car_id
+    }, headers=headers)
+    await client.post("/orders", json={
+        "description": "Wymiana oleju", "status": "COMPLETED", "total_cost": 200, "car_id": car_id
+    }, headers=headers)
+
+    data = (await client.get("/api/v1/dashboard", headers=headers)).json()
+    assert data["clients_count"] == 1
+    assert data["cars_count"] == 1
+    assert data["active_orders"] == 1
+    assert data["completed_orders"] == 1
+    assert data["revenue"] == 200
+    assert data["recent_orders"][0]["car_name"] == "Kia Ceed"
+    assert data["recent_orders"][0]["client_name"] == "Jan Dash"
+
+    assert (await client.get("/api/v1/dashboard")).status_code == 401
