@@ -1,6 +1,7 @@
 """Endpointy API do zarządzania klientami, pojazdami, zleceniami i użytkownikami."""
 
-from typing import Optional, List
+from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +15,14 @@ import schemas
 from database import engine, Base, get_db
 from auth import hash_password, verify_password, create_access_token, get_current_user, require_role
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # tworzy tabele w bazie przy starcie aplikacji
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
-app = FastAPI(title="Warsztat samochodowy API")
+app = FastAPI(title="Warsztat samochodowy API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,11 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-#Tworzy tabele w bazie przy starcie aplikacji.
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
 @app.get("/")
 def home():
@@ -495,7 +497,8 @@ async def register(user: schemas.UserCreate, db: AsyncSession = Depends(get_db))
 @app.post("/login", response_model=schemas.Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     #Loguje użytkownika i zwraca token JWT.
-    result = await db.execute(select(models.User).where(models.User.email == form_data.username))
+    email = form_data.username.strip().lower()
+    result = await db.execute(select(models.User).where(models.User.email == email))
     user = result.scalars().first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -503,6 +506,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Niepoprawny email lub hasło",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Konto jest nieaktywne."
         )
 
     access_token = create_access_token(data={"sub": user.email, "role": user.role})
