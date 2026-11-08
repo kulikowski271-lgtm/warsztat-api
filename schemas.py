@@ -122,6 +122,10 @@ class ClientCreate(ClientBase):
     #Żądanie utworzenia klienta.
     pass
 
+class ClientUpdate(ClientBase):
+    #Żądanie edycji klienta (PUT), wszystkie pola jak przy tworzeniu.
+    pass
+
 class ClientResponse(ClientBase):
     #Odpowiedź API z danymi klienta i jego pojazdami.
     id: int

@@ -274,3 +274,31 @@ async def test_dashboard_stats(client, admin_token):
     assert data["recent_orders"][0]["client_name"] == "Jan Dash"
 
     assert (await client.get("/api/v1/dashboard")).status_code == 401
+
+@pytest.mark.asyncio
+async def test_update_client(client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    first = await client.post("/clients", json={
+        "first_name": "Jan", "last_name": "Stary", "phone": "111", "email": "jan.stary@test.pl"
+    }, headers=headers)
+    other = await client.post("/clients", json={
+        "first_name": "Ola", "last_name": "Inna", "phone": "222", "email": "ola.inna@test.pl"
+    }, headers=headers)
+    client_id = first.json()["id"]
+
+    res = await client.put(f"/clients/{client_id}", json={
+        "first_name": "Jan", "last_name": "Nowy", "phone": "333", "email": "jan.stary@test.pl"
+    }, headers=headers)
+    assert res.status_code == 200
+    assert res.json()["last_name"] == "Nowy"
+
+    res = await client.put(f"/clients/{client_id}", json={
+        "first_name": "Jan", "last_name": "Nowy", "phone": "333", "email": "ola.inna@test.pl"
+    }, headers=headers)
+    assert res.status_code == 400
+
+    res = await client.put("/clients/99999", json={
+        "first_name": "X", "last_name": "Y", "phone": "1", "email": "x@y.pl"
+    }, headers=headers)
+    assert res.status_code == 404

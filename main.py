@@ -182,6 +182,50 @@ async def get_client(
 
     return client
 
+@app.put("/clients/{client_id}", response_model=schemas.ClientResponse)
+async def update_client(
+        client_id: int,
+        client_update: schemas.ClientUpdate,
+        db: AsyncSession = Depends(get_db),
+        _current_user: models.User = Depends(require_role("MECHANIC"))
+):
+    #Aktualizuje dane klienta. Wymaga roli MECHANIC.
+    result = await db.execute(
+        select(models.Client)
+        .options(selectinload(models.Client.cars))
+        .where(models.Client.id == client_id)
+        .execution_options(populate_existing=True)
+    )
+    client = result.scalar_one_or_none()
+
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Klient o id {client_id} nie został znaleziony."
+        )
+
+    clean_email = client_update.email.strip().lower()
+    duplicate = await db.execute(
+        select(models.Client).where(
+            models.Client.email == clean_email,
+            models.Client.id != client_id
+        )
+    )
+    if duplicate.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Klient z adresem email {clean_email} już istnieje w bazie."
+        )
+
+    client.first_name = client_update.first_name
+    client.last_name = client_update.last_name
+    client.phone = client_update.phone
+    client.email = clean_email
+
+    await db.commit()
+    await db.refresh(client, attribute_names=["cars"])
+    return client
+
 @app.delete("/clients/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
         client_id: int,
