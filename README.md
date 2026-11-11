@@ -23,6 +23,8 @@ Zbudowane w **FastAPI** z asynchroniczną obsługą **PostgreSQL**, uwierzytelni
 - Zarządzanie pojazdami z filtrami, wyszukiwaniem i paginacją
 - Zarządzanie zleceniami serwisowymi (statusy, koszty, filtry, paginacja)
 - Dashboard ze statystykami (liczby, przychód, ostatnie aktywne zlecenia)
+- **Walidacja Pydantic v2**: automatyczne zaokrąglanie kosztów, sprawdzanie zakresu lat produkcji pojazdów oraz unikalności numerów rejestracyjnych i emaili
+- **Spójna paginacja**: wszystkie listy zwracają dane w ujednoliconym formacie `{ items, total }`
 - Reguły biznesowe: nie można usunąć klienta z pojazdami ani pojazdu ze zleceniami
 - Health check sprawdzający realne połączenie z bazą danych
 
@@ -119,9 +121,12 @@ Skrypt zapyta o email i hasło, a następnie utworzy użytkownika z rolą `ADMIN
 | POST | `/clients` | Dodanie klienta | `MECHANIC` |
 | GET | `/clients` | Lista (search, limit, offset) | zalogowany |
 | GET | `/clients/{client_id}` | Szczegóły klienta | `MECHANIC` |
+| PUT | `/clients/{client_id}` | Edycja danych klienta (walidacja unikalności emaila) | `MECHANIC` |
 | DELETE | `/clients/{client_id}` | Usunięcie (tylko bez pojazdów) | `ADMIN` |
 
 **Query params (`GET /clients`):** `search`, `limit` (1–100), `offset`
+
+**Format odpowiedzi list (`GET /clients`):** `{ items: Client[], total: int }`
 
 ### Pojazdy
 
@@ -135,6 +140,8 @@ Skrypt zapyta o email i hasło, a następnie utworzy użytkownika z rolą `ADMIN
 
 **Query params (`GET /cars`):** `search`, `brand`, `model`, `owner_id`, `limit`, `offset`
 
+**Format odpowiedzi list (`GET /cars`):** `{ items: Car[], total: int }`
+
 ### Zlecenia serwisowe
 
 | Metoda | Endpoint | Opis | Wymagana rola |
@@ -145,6 +152,8 @@ Skrypt zapyta o email i hasło, a następnie utworzy użytkownika z rolą `ADMIN
 | PATCH | `/orders/{order_id}` | Częściowa aktualizacja (m.in. status, koszt, pojazd) | `MECHANIC` |
 
 **Query params (`GET /orders`):** `search`, `status`, `car_id`, `min_cost`, `max_cost`, `limit`, `offset`
+
+**Format odpowiedzi list (`GET /orders`):** `{ items: ServiceOrder[], total: int }`
 
 **Statusy zlecenia:** `PENDING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
 
